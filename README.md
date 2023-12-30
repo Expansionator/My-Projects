@@ -1,7 +1,7 @@
 # My Personal Projects (ig?)
 
 These are my projects that i just worked on for fun.
-If you want to use it, go ahead.\n- not
+If you want to use it, go ahead.
 
 Uploading here since Roblox Marketplace can't show my models.
 
@@ -11,7 +11,7 @@ Uploading here since Roblox Marketplace can't show my models.
 - A system to give the player tools if they have the required rank to do so.
 Comments are provided.
 
-https://create.roblox.com/marketplace/asset/15744230662/Group-Tools-Giver
+[Click here to go to the webpage](https://create.roblox.com/marketplace/asset/15744230662/Group-Tools-Giver)
 
 `Randomizer`:
 - A randomizer function that selects a index based on their percentage.
