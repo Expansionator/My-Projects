@@ -8,7 +8,8 @@ Uploading here since Roblox Marketplace can't show my models.
 **The links to each file/model are provided here:**
 
 `Group Tools Giver`:
-> testing example
+- A system to give the player tools if they have the required rank to do so.
+Comments are provided.
 
 https://create.roblox.com/marketplace/asset/15744230662/Group-Tools-Giver
 
