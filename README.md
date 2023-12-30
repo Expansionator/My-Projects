@@ -5,7 +5,7 @@ If you want to use it, go ahead.
 
 Uploading here since Roblox Marketplace can't show my models.
 
-**The links to each file/model are provided here:**
+<span **The links to each file/model are provided here:** style="color: red;">red</span>
 
 `Group Tools Giver`:
 - A system to give the player tools if they have the required rank to do so.
