@@ -11,7 +11,7 @@ Uploading here since Roblox Marketplace can't show my models.
 - A system to give the player tools if they have the required rank to do so.
 Comments are provided.
 
-[Click here to go to the webpage](https://create.roblox.com/marketplace/asset/15744230662/Group-Tools-Giver)
+https://create.roblox.com/marketplace/asset/15744230662/Group-Tools-Giver
 
 `Randomizer`:
 - A randomizer function that selects a index based on their percentage.
