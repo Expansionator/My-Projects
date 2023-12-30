@@ -6,5 +6,7 @@ If you want to use it, go ahead.
 **The links to each file/object are provided here:**
 
 `Group Tools Giver`:
-```https://create.roblox.com/marketplace/asset/15744230662```
+```https://create.roblox.com/marketplace/asset/15744230662/Group-Tools-Giver```
 
+`Randomizer`:
+```https://create.roblox.com/marketplace/asset/15711479828/Randomizer```
