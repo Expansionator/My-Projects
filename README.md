@@ -1,14 +1,14 @@
 # My Personal Projects (ig?)
 
 These are my projects that i just worked on for fun.
-If you want to use it, go ahead.
+If you want to use it, go ahead.\n- not
 
 Uploading here since Roblox Marketplace can't show my models.
 
 **The links to each file/model are provided here:**
 
 `Group Tools Giver`:
-> A system to give the player tools if they have the required rank to do so.
+- A system to give the player tools if they have the required rank to do so.
 Comments are provided.
 
 https://create.roblox.com/marketplace/asset/15744230662/Group-Tools-Giver
