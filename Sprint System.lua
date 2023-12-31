@@ -118,7 +118,9 @@ local function stopSprinting()
 		humanoid.WalkSpeed = DEFAULT_SPEED
 	end
 
-	tween(camera, TweenInfo.new(FOV_CHANGING_SPEED), {FieldOfView = DEFAULT_CAMERA_FOV})
+	if CAMERA_FOV_CHANGE then
+		tween(camera, TweenInfo.new(FOV_CHANGING_SPEED), {FieldOfView = DEFAULT_CAMERA_FOV})
+	end
 end
 
 local function startSprinting()
@@ -136,7 +138,9 @@ local function startSprinting()
 		humanoid.WalkSpeed = MAX_SPEED
 	end
 
-	tween(camera, TweenInfo.new(FOV_CHANGING_SPEED), {FieldOfView = MAX_CAMERA_FOV})
+	if CAMERA_FOV_CHANGE then
+		tween(camera, TweenInfo.new(FOV_CHANGING_SPEED), {FieldOfView = MAX_CAMERA_FOV})
+	end
 end
 
 local function configureSpeed(action: "Start" | "End")
