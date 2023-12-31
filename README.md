@@ -44,9 +44,9 @@ https://create.roblox.com/marketplace/asset/15744245914/Constructor
 https://create.roblox.com/marketplace/asset/15744240904/Serializer
 
 `Signal`:
-- A simple Signal based module that can track and modify any event connections. 
+- A straightforward module based on Signal that is capable of monitoring and altering connections for any event. 
 
-https://create.roblox.com/marketplace/asset/15744237732/Signal
+https://create.roblox.com/marketplace/asset/15816776913/Signaller
 
 `TypeWritter`:
 - A module that can insert each character from a string at a certain speed into a textlabel.
