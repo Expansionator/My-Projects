@@ -37,7 +37,7 @@ local MAX_CAMERA_FOV = 140 -- The max FOV for the camera
 
 local TOGGLE_SPRINT = false -- Uses a toggle system for sprinting. If false, it will require the player to hold the button
 
-local STAMINA_SYSTEM = false -- Makes it so that the player has limited sprint based on their stamina. Creates a Number value inside this script indicating the user's speed
+local STAMINA_SYSTEM = false -- Makes it so that the player has limited sprint based on their stamina. Creates a Number value inside this script indicating the user's stamina
 local MAX_STAMINA = 100 -- The max stamina that the player can have
 local STAMINA_INCREMENT = 1 -- How many steps before reaching the max stamina
 local STAMINA_SPEED = 0.5 -- In seconds, how long will it take to regenerate/degenerate the stamina
