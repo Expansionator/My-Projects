@@ -48,6 +48,11 @@ https://create.roblox.com/marketplace/asset/15744240904/Serializer
 
 https://create.roblox.com/marketplace/asset/15816776913/Signaller
 
+`Sprint System`:
+- A sprinting system with many settings that can configured.
+
+https://create.roblox.com/marketplace/asset/15819921722/Sprint-System
+
 `TypeWritter`:
 - A module that can insert each character from a string at a certain speed into a textlabel.
 
