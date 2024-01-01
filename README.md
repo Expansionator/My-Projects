@@ -13,6 +13,11 @@ Comments are provided.
 
 https://create.roblox.com/marketplace/asset/15744230662/Group-Tools-Giver
 
+`Custom Backpack`:
+- A custom backpack system that is supposed to imitate the old roblox backpack.
+
+https://create.roblox.com/marketplace/asset/15835473152/Custom-Backpack
+
 `Randomizer`:
 - A randomizer function that selects a index based on their percentage.
 
