@@ -43,11 +43,6 @@ https://create.roblox.com/marketplace/asset/15744249499/Reconciler
 
 https://create.roblox.com/marketplace/asset/15744245914/Constructor
 
-`Serializer`:
-- This module serializes CFrame's and other data types into strings/numbers for tasks such as storing them into Datastores. It also supports the deserialization of the serialized content.
-
-https://create.roblox.com/marketplace/asset/15744240904/Serializer
-
 `Signal`:
 - A straightforward module based on Signal that is capable of monitoring and altering connections for any event. 
 
