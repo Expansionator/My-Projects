@@ -33,6 +33,11 @@ https://create.roblox.com/marketplace/asset/15808326558/GetClosestPlayer
 
 https://create.roblox.com/marketplace/asset/15774087747/PathFinder
 
+`Invoke Client`:
+- A module designed to invoke the client without the risk of indefinite waiting.
+
+https://create.roblox.com/marketplace/asset/15920135996/Invoke-Client
+
 `Reconciler`:
 - A module that can fill in any missing values in a table using a template.
 
