@@ -3,8 +3,6 @@
 These are my projects that i just worked on for fun.
 If you want to use it, go ahead.
 
-Uploading here since Roblox Marketplace can't show my models.
-
 **The links to each file/model are provided here:**
 
 `Group Tools Giver`:
