@@ -41,6 +41,11 @@ https://create.roblox.com/marketplace/asset/15920135996/Invoke-Client
 
 https://create.roblox.com/marketplace/asset/15961807631/Perlin-Noise
 
+`Mouse`:
+- An alternative for the GetMouse() function.
+
+https://create.roblox.com/marketplace/asset/15970181765/Mouse
+
 `Reconciler`:
 - A module that can fill in any missing values in a table using a template.
 
