@@ -36,6 +36,11 @@ https://create.roblox.com/marketplace/asset/15774087747/PathFinder
 
 https://create.roblox.com/marketplace/asset/15920135996/Invoke-Client
 
+`Perlin Noise`:
+- The process of generating terrain using Perlin noise.
+
+https://create.roblox.com/marketplace/asset/15961807631/Perlin-Noise
+
 `Reconciler`:
 - A module that can fill in any missing values in a table using a template.
 
