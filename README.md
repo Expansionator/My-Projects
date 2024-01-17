@@ -46,6 +46,11 @@ https://create.roblox.com/marketplace/asset/15961807631/Perlin-Noise
 
 https://create.roblox.com/marketplace/asset/15970181765/Mouse
 
+`Turret`:
+- A basic Turret system that can shoot players if they're in range.
+
+https://create.roblox.com/marketplace/asset/16014101633/Turret
+
 `Reconciler`:
 - A module that can fill in any missing values in a table using a template.
 
