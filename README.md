@@ -56,6 +56,11 @@ https://create.roblox.com/marketplace/asset/16014101633/Turret
 
 https://create.roblox.com/marketplace/asset/15744249499/Reconciler
 
+`PathNavigator`:
+- This module helps you easily find and get things in your game by using custom paths to search for objects.
+
+https://create.roblox.com/marketplace/asset/16047070889/PathNavigator
+
 `Constructor`:
 - A module that helps the creations of Instances and can be nested into oneanother.
 
