@@ -46,6 +46,11 @@ https://create.roblox.com/store/asset/15961807631/Perlin-Noise
 
 https://create.roblox.com/store/asset/15970181765/Mouse
 
+`ObjectSpawner`:
+- The module that can create an object using a randomized position in a defined region.
+
+https://create.roblox.com/store/asset/16263917747/ObjectSpawner
+
 `Turret`:
 - A basic Turret system that can shoot players if they're in range.
 
