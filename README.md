@@ -71,6 +71,11 @@ https://create.roblox.com/store/asset/16047070889/PathNavigator
 
 https://create.roblox.com/store/asset/16144473492/StringGen
 
+`PartSerializer`:
+- A module that allows you to serialize and deserialize basepart properties.
+
+https://create.roblox.com/store/asset/16461952483/PartSerializer
+
 `Constructor`:
 - A module that helps the creations of Instances and can be nested into oneanother.
 
