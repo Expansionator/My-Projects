@@ -29,7 +29,7 @@ https://create.roblox.com/store/asset/15808326558/GetClosestPlayer
 
 https://create.roblox.com/store/asset/15774087747/PathFinder
 
-`Invoke Client`:
+`InvokeClient`:
 - A module designed to invoke the client without the risk of indefinite waiting.
 
 https://create.roblox.com/store/asset/15920135996/Invoke-Client
