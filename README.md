@@ -1,6 +1,6 @@
 # My Personal Projects (ig?)
 
-These are my projects that i work on for fun. If you want to use it, go ahead.__
+These are my projects that i work on for fun. If you want to use it, go ahead.\
 **The links to each file/model are provided here:**
 
 `Group Tools Giver`:
