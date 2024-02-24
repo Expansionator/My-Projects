@@ -34,6 +34,11 @@ https://create.roblox.com/store/asset/15774087747/PathFinder
 
 https://create.roblox.com/store/asset/15920135996/Invoke-Client
 
+`Pistol`:
+- A fully customizable pistol that can shoot players and entities.
+
+https://create.roblox.com/store/asset/16506033816/Pistol
+
 `Perlin Noise`:
 - The process of generating terrain using Perlin noise.
 
