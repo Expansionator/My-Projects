@@ -90,7 +90,7 @@ https://create.roblox.com/store/asset/15744245914/Constructor
 https://create.roblox.com/store/asset/15816776913/Signaller
 
 `Sprint System`:
-- A sprinting system with many settings that can configured.
+- A sprinting system with many settings that can be configured.
 
 https://create.roblox.com/store/asset/15819921722/Sprint-System
 
