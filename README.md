@@ -74,6 +74,11 @@ https://create.roblox.com/store/asset/16047070889/PathNavigator
 
 https://create.roblox.com/store/asset/16144473492/StringGen
 
+`NextBot`:
+- The bot that behaves like a NextBot with full customizable options.
+
+https://create.roblox.com/store/asset/16650654459/Nextbot
+
 `PartSerializer`:
 - A module that allows you to serialize and deserialize basepart properties.
 
