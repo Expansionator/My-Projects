@@ -59,6 +59,11 @@ https://create.roblox.com/store/asset/16263917747/ObjectSpawner
 
 https://create.roblox.com/store/asset/16014101633/Turret
 
+`TimeFormatter`:
+- A module to format the time into a readable format.
+
+https://create.roblox.com/store/asset/16668727527/TimeFormatter
+
 `Reconciler`:
 - A module that can fill in any missing values in a table using a template.
 
