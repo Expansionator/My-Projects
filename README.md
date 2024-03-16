@@ -64,6 +64,11 @@ https://create.roblox.com/store/asset/16014101633/Turret
 
 https://create.roblox.com/store/asset/16668727527/TimeFormatter
 
+`AnimationHandler`:
+- A module that handles animation-based requests for the player.
+
+https://create.roblox.com/store/asset/16765818059/AnimationHandler
+
 `Reconciler`:
 - A module that can fill in any missing values in a table using a template.
 
