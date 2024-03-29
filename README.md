@@ -64,7 +64,7 @@ Comments are provided.
 [Constructor](https://create.roblox.com/store/asset/15744245914/Constructor)
 - A module that helps the creations of Instances and can be nested into oneanother.
 
-[Signal](https://create.roblox.com/store/asset/15816776913/Signaller)
+[Signaller](https://create.roblox.com/store/asset/15816776913/Signaller)
 - A straightforward module based on Signal that is capable of monitoring and altering connections for any event. 
 
 [TypeWritter](https://create.roblox.com/store/asset/15735713483/TypeWritter)
