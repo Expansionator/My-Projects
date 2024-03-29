@@ -19,6 +19,9 @@ Comments are provided.
 [PathFinder](https://create.roblox.com/store/asset/15774087747/PathFinder)
 - The module designed for bots to pathfind to a position with full customizable functions.
 
+[CircleGenerator](https://create.roblox.com/store/asset/16920205316/CircleGenerator)
+- A simple circle generator using a reference part.
+
 [InvokeClient](https://create.roblox.com/store/asset/15920135996/Invoke-Client)
 - A module designed to invoke the client without the risk of indefinite waiting.
 
