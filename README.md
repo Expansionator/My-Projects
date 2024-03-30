@@ -16,6 +16,9 @@ Comments are provided.
 [GetClosestPlayer](https://create.roblox.com/store/asset/15808326558/GetClosestPlayer)
 - Finds the closest player to a specific part. Useful for making AI bots.
 
+[DataCacher](https://create.roblox.com/store/asset/16938922167/DataCacher)
+- A datastore extension module that behaves similarly to a normal datastore.
+
 [PathFinder](https://create.roblox.com/store/asset/15774087747/PathFinder)
 - The module designed for bots to pathfind to a position with full customizable functions.
 
