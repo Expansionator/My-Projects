@@ -34,6 +34,9 @@ Comments are provided.
 [Perlin Noise](https://create.roblox.com/store/asset/15961807631/Perlin-Noise)
 - The process of generating terrain using Perlin noise.
 
+[Digital Clock](https://create.roblox.com/store/asset/16972180781/Digital-Clock)
+- A simple 24-hour based digital clock.
+
 [Mouse](https://create.roblox.com/store/asset/15970181765/Mouse)
 - An alternative for the GetMouse() function.
 
