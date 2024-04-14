@@ -71,7 +71,10 @@ Comments are provided.
 - A module that helps the creations of Instances and can be nested into oneanother.
 
 [Signaller](https://create.roblox.com/store/asset/15816776913/Signaller)
-- A straightforward module based on Signal that is capable of monitoring and altering connections for any event. 
+- A straightforward module based on Signal that is capable of monitoring and altering connections for any event.
+
+[Signal V2](https://create.roblox.com/store/asset/17147021259/Signal-V2)
+- A Signal module that behaves like a RBXScriptSignal, without the use of Bindables.
 
 [TypeWritter](https://create.roblox.com/store/asset/15735713483/TypeWritter)
 - A module that can insert each character from a string at a certain speed into a textlabel.
