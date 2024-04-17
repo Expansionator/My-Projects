@@ -40,6 +40,9 @@ Comments are provided.
 [Mouse](https://create.roblox.com/store/asset/15970181765/Mouse)
 - An alternative for the GetMouse() function.
 
+[MouseHover](https://create.roblox.com/store/asset/17178927203/MouseHover)
+- An alternative to Gui.MouseEnter, Gui.MouseLeave and Gui.MouseMoved.
+
 [ObjectSpawner](https://create.roblox.com/store/asset/16263917747/ObjectSpawner)
 - The module that can create an object using a randomized position in a defined region.
 
