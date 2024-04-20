@@ -19,6 +19,9 @@ Comments are provided.
 [DataCacher](https://create.roblox.com/store/asset/16938922167/DataCacher)
 - A datastore extension module that behaves similarly to a normal datastore.
 
+[LookAt](https://create.roblox.com/store/asset/17226361481/LookAt)
+- An alternative to CFrame.lookAt().
+
 [PathFinder](https://create.roblox.com/store/asset/15774087747/PathFinder)
 - The module designed for bots to pathfind to a position with full customizable functions.
 
