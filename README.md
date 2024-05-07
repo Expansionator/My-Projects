@@ -1,6 +1,6 @@
 # My Personal Projects (ig?)
 
-These are my projects that i work on for fun. If you want to use it, go ahead.\
+These are my projects that I work on for fun. If you want to use it, go ahead.\
 **The links to each file/model are provided here:**
 
 [Group Tools Giver](https://create.roblox.com/store/asset/15744230662/Group-Tools-Giver)
