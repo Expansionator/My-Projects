@@ -864,15 +864,17 @@ end
 
 game:BindToClose(function()
 	local processed_time = os.clock()
-	if not RunService:IsStudio() then
-		for key, _ in Globals.RegisteredDataStores do
-			local datastore = DataCacher.GetRegisteredDatastore(key, 1)
-			if datastore then
-				for _, player in Players:GetPlayers() do
-					coroutine.wrap(function()
-						datastore:Save(player)
-					end)()
-				end
+	for key, _ in Globals.RegisteredDataStores do
+		local datastore = DataCacher.GetRegisteredDatastore(key, 1)
+		if datastore then
+			if RunService:IsStudio() and not datastore.__raw.options.SaveInStudio then
+				continue
+			end
+
+			for _, player in Players:GetPlayers() do
+				coroutine.wrap(function()
+					datastore:Save(player)
+				end)()
 			end
 		end
 	end
