@@ -10,6 +10,9 @@ Comments are provided.
 [Custom Backpack](https://create.roblox.com/store/asset/15835473152/Custom-Backpack)
 - A custom backpack system that is supposed to imitate the old roblox backpack.
 
+PyString (link is unavailable)
+- A module encompassing string methods inherited from Python.
+
 [Randomizer](https://create.roblox.com/store/asset/15711479828/Randomizer)
 - A randomizer function that selects a index based on their percentage.
 
