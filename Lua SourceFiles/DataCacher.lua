@@ -364,21 +364,6 @@ do
 		end)
 		return success and result or FILTERED_RESULT
 	end
-
-	Globals.CleanUp = function(t: {})
-		for index, _ in t do
-			local type = typeof(t[index])
-			if type == "thread" then task.cancel(t[index])
-			elseif type == "RBXScriptConnection" then t[index]:Disconnect()
-			elseif type == "Instance" then t[index]:Destroy()
-			elseif type == "table" then
-				Globals.CleanUp(t[index])
-				RunService.Heartbeat:Wait()
-			end
-
-			t[index] = nil
-		end
-	end
 end
 
 local Signal
@@ -469,7 +454,7 @@ function DataCacher.CreateDatastore(DatastoreKey: string, DatastoreOptions: Data
 	local options = Globals.Duplicate(DatastoreOptions or {})
 	options = Globals.Reconcile(options, TemplateOptions)
 
-	checkForArguments(DatastoreOptions)
+	checkForArguments(options)
 
 	if options.AllowClientSideToRead then
 		if not Globals.ClientRemote then
@@ -863,7 +848,6 @@ function DataCacher:GetDataSizeInBytes(player: Player): (number, boolean)
 end
 
 game:BindToClose(function()
-	local processed_time = os.clock()
 	for key, _ in Globals.RegisteredDataStores do
 		local datastore = DataCacher.GetRegisteredDatastore(key, 1)
 		if datastore then
@@ -878,27 +862,9 @@ game:BindToClose(function()
 			end
 		end
 	end
-
-	for signal_agent, _ in Signal.signal_stored_connections do
-		Signal.Disconnect(signal_agent)
-	end
-
-	for key, _ in Globals.RegisteredDataStores do
-		local datastore = DataCacher.GetRegisteredDatastore(key, 1)
-		if datastore then
-			Globals.CleanUp(datastore.__raw.playerData)
-			Globals.CleanUp(datastore.__raw.events)
-			Globals.CleanUp(datastore.__raw.changed) 
-			Globals.CleanUp(datastore.__raw.auto_save)
-			Globals.CleanUp(datastore.__raw.requests)
-			Globals.CleanUp(datastore.__raw.options)
-		end
-	end
-
-	Globals.CleanUp(Globals.RegisteredDataStores)
-
+	
 	--> Let everything process before closing
-	task.wait(3 - (os.clock() - processed_time))
+	task.wait(3)
 end)
 
 return DataCacher
