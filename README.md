@@ -40,6 +40,9 @@ Comments are provided.
 [Pistol](https://create.roblox.com/store/asset/16506033816/Pistol)
 - A fully customizable pistol that can shoot players and entities.
 
+[Rifle](https://create.roblox.com/store/asset/17827011245/Rifle)
+- A Rifle that can shoot players and entities.
+
 [Perlin Noise](https://create.roblox.com/store/asset/15961807631/Perlin-Noise)
 - The process of generating terrain using Perlin noise.
 
