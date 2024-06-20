@@ -19,6 +19,12 @@ Notes:
 
 ------------------------------------------------------
 
+PS:
+
+- I didn't add Session Locking as the idea of it is relatively stupid
+
+------------------------------------------------------
+
 Usage:
 
 --> Functions:
@@ -150,22 +156,19 @@ end
 
 ]]
 
-local os = os local math = math local game = game local string = string
-local tonumber = tonumber local Instance = Instance local pcall = pcall
-local task = task local table = table local setmetatable = setmetatable
-local coroutine = coroutine local tostring = tostring
-
 local print = function(...) local vargs = "" for _, arg in {...} do 
 		if typeof(arg) == "table" then print(script.Name.." [Table]:", arg) else vargs = vargs..tostring(arg).." " end end if vargs ~= "" then return print(script.Name..": "..vargs)
-	end 
+	end
 end
+
 local warn = function(...) local vargs = "" for _, arg in {...} do 
 		if typeof(arg) == "table" then warn(script.Name.." [Table]:", arg) else vargs = vargs..tostring(arg).." " end end if vargs ~= "" then return print(script.Name..": "..vargs)
-	end 
+	end
 end
+
 local error = function(...) local vargs = "" for _, arg in {...} do 
 		if typeof(arg) == "table" then error(script.Name.." [Table]:", arg) else vargs = vargs..tostring(arg).." " end end if vargs ~= "" then return print(script.Name..": "..vargs)
-	end 
+	end
 end
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -247,24 +250,27 @@ local TemplateOptions = {
 export type Listeners = "Changed" | "Loaded" | "Released" | "Wiped"
 export type DatastoreOptions = {
 	Key: string?;
+	ClientSideAgent: string?;
+
 	TemplateData: {}?;
+
 	CreateListeners: boolean?;
 	ThrottleRequests: boolean?;
 	CompressFloatNumbers: boolean?;
 	AutoSaving: boolean?;
 	AutoSavingDuration: number?;
 	FilterStringContent: boolean?;
+	AllowClientSideToRead: boolean?;
+	SaveInStudio: boolean?;
+	RecursiveCalls: boolean?;
 
 	FilterStringContentOptions: {
 		WhiteListEnabled: boolean?;
 		BlackListEnabled: boolean?;
+
 		StringIndexList: {}?;
 	}?;
 
-	AllowClientSideToRead: boolean?;
-	ClientSideAgent: string?;
-	SaveInStudio: boolean?;
-	RecursiveCalls: boolean?;
 	CallAttempts: number?;
 	RetryCallDelay: number?;
 }
@@ -673,7 +679,7 @@ function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> ni
 		end)
 	end
 
-	if not AutoSaving then
+	if not AutoSaving then	
 		self.__raw.playerData[player] = nil
 		if self.__raw.changed[player] then
 			self.__raw.changed[player]:Disconnect()
@@ -693,9 +699,13 @@ function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> ni
 			end
 
 			self.__raw.waitForThrottle("UPDATE")
-			self.__raw.datastore:UpdateAsync(key, function(oldData)
+			self.__raw.datastore:UpdateAsync(key, Callback or function(oldData: {})
 				local previousData = oldData or data
 				previousData["Version"] = previousData.Version or 1
+
+				if AutoSaving then
+					return data
+				end
 
 				if data.Version == previousData.Version then
 					data.Version += 1
@@ -729,15 +739,14 @@ function DataCacher:Get(player: Player, ViewRawData: boolean?): {}
 			self.__raw.playerData[player]["data"])
 end
 
-function DataCacher:GetDataOffline(UserId: number): {}
+function DataCacher:GetDataOffline(UserId: number): {}?
 	local key = getPlayerKey(UserId, self.__raw.options.Key)
 	local success, result = pcall(function()
 		self.__raw.waitForThrottle("GET")
 		return self.__raw.datastore:GetAsync(key)
 	end)
 
-	result = result and Globals.Duplicate(result) or {}
-	return result
+	return result and Globals.Duplicate(result)
 end
 
 function DataCacher:SaveDataOffline(UserId: number, Data: {}): boolean
@@ -848,6 +857,9 @@ function DataCacher:GetDataSizeInBytes(player: Player): (number, boolean)
 end
 
 game:BindToClose(function()
+	local total_requests_needed = 0
+	local requests_made = 0
+
 	for key, _ in Globals.RegisteredDataStores do
 		local datastore = DataCacher.GetRegisteredDatastore(key, 1)
 		if datastore then
@@ -856,15 +868,18 @@ game:BindToClose(function()
 			end
 
 			for _, player in Players:GetPlayers() do
+				total_requests_needed += 1
 				coroutine.wrap(function()
-					datastore:Save(player)
+					pcall(datastore.Save, datastore, player)
+					requests_made += 1
 				end)()
 			end
 		end
 	end
-	
-	--> Let everything process before closing
-	task.wait(3)
+
+	while requests_made ~= total_requests_needed do
+		RunService.Heartbeat:Wait()
+	end
 end)
 
 return DataCacher
