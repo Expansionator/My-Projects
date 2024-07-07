@@ -25,6 +25,9 @@ Comments are provided.
 [DataCacher](https://create.roblox.com/store/asset/16938922167/DataCacher)
 - A datastore extension module that behaves similarly to a normal datastore.
 
+[TableConverter](https://create.roblox.com/store/asset/18372650053/TableConverter)
+- A module to convert a type of table into another.
+
 [LookAt](https://create.roblox.com/store/asset/17226361481/LookAt)
 - An alternative to CFrame.lookAt().
 
