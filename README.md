@@ -13,6 +13,9 @@ Comments are provided.
 [PyString](https://create.roblox.com/store/asset/17469135418/PyString)
 - A module encompassing string methods inherited from Python.
 
+[Flashlight](https://create.roblox.com/store/asset/18736271769/Flashlight)
+- A very simple server-sided flashlight.
+
 [UpdateCountdown](https://create.roblox.com/store/asset/17532640379/UpdateCountdown)
 - An update countdown board that will count down until the timer ends.
 
