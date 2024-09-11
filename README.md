@@ -88,6 +88,9 @@ Comments are provided.
 [PartSerializer](https://create.roblox.com/store/asset/16461952483/PartSerializer)
 - A module that allows you to serialize and deserialize basepart properties.
 
+[TextFiller](https://create.roblox.com/store/asset/85034364687639/TextFiller)
+- Fills in the spaces from a text using a filler and adding a text after it.
+
 [Constructor](https://create.roblox.com/store/asset/15744245914/Constructor)
 - A module that helps the creations of Instances and can be nested into oneanother.
 
