@@ -11,17 +11,15 @@ A datastore extension module that behaves similarly to a normal datastore.
 Notes:
 
 - This system caches the player's data into a table which can be easily modified
+- A basic session-locking mechanism has also been implemented into this system
+	If a session is loaded and has not expired, the player will be kicked from the server
 - Tables that are returned from Listeners will be a duplicate and is meant to be viewed only
 - Listeners can return different types of values
+- Auto saving is automatically enabled in this system
 - If 'AllowClientSideToRead' is true, you have to invoke the RemoteFunction that is located inside ReplicatedStorage to retrieve the client data
+	Warning: The data received will show the whole contents of the player's data
 - If 'ViewRawData' is true, you cannot modify that data
 - You can only migrate/import ('MigratedData') new data if it had not been saved
-
-------------------------------------------------------
-
-PS:
-
-- I didn't add Session Locking as the idea of it is relatively stupid
 
 ------------------------------------------------------
 
@@ -39,9 +37,10 @@ DataCacher.GetRegisteredDatastore(DatastoreKey: string, Timeout: number?)
 
 Datastore:Load(player: Player, MigratedData: {}?): {}
 > Description: Loads the player's data, with an option to use an existing data as a 'template'
+> Note: The player will be kicked if there is already a session active
 > Returns: Data: {}
 
-Datastore:Save(player: Player, Callback: (data: {}, oldData: {}) -> nil?, AutoSaving: boolean?): boolean
+Datastore:Save(player: Player, Callback: (data: {}, oldData: {}) -> {}?, AutoSaving: boolean?): boolean
 > Description: Saves the player's data using UpdateAsync, with an option to configure what it should save
 > Returns: Success: boolean
 
@@ -49,21 +48,20 @@ Datastore:Get(player: Player, ViewRawData: boolean?): {}
 > Description: Gets the player's cached data, or if 'ViewRawData' is true, returns a duplicate of the raw data
 > Returns: Data: {} | Raw Data: {}
 
-Datastore:GetDataOffline(UserId: number): {}
-> Description: Returns a duplicate of the player's saved data (if any), which can be saved (offline) later
-> Returns: Data: {}
-
-Datastore:SaveDataOffline(UserId: number, Data: {}): boolean
-> Description: Saves the provided data using SetAsync, preferably data from GetDataOffline() 
-> Returns: Success: boolean
-
 Datastore:Wipe(player: Player)
 > Description: Clears the player's data and replacing it with a fresh one, and using the method SetAsync to overwrite the player's data
 > Returns: nil | void
 
-Datastore:View(player: Player)
-> Description: Prints the contents within the player's data
-> Returns: nil | void
+Datastore:GetDataAsync(UserId: number): {}
+> Description: Returns a duplicate of the player's saved data (if any), which can be saved (offline) later
+> Returns: Data: {}
+
+Datastore:SaveDataAsync(UserId: number, Data: {}, ForceSave: boolean?): boolean
+> Description: Saves the provided data using SetAsync, preferably data from GetDataAsync()
+> Notes: This function will not save if there is already a session active
+		 If ForceSave is true, data will be saved regardless if there is an active session
+		 	This *will* result in data loss if the session is active
+> Returns: Success: boolean
 
 Datastore:GetListener(ListenerType: Listeners, Callback: (player: Player, ...any) -> nil)
 > Description: Listens to when the player's data is added, modified or removed
@@ -79,9 +77,9 @@ Datastore:ClearListeners()
 > Description: Similar to RemoveListener(), except that it's for all listener types
 > Returns: nil | void
 
-Datastore:GetDataSizeInBytes(player: Player): (number, boolean)
-> Description: Checks whether if the player's raw data is within the size range (4 MB)
-> Returns: Size: number (In Bytes), boolean
+DataCacher:GetDatastoreObject(): DataStore
+> Description: Returns the actual datastore object
+> Returns: DataStore
 
 ------------------------------------------------------
 
@@ -94,10 +92,6 @@ local DataCacher = require(ServerScriptService.DataCacher)
 
 local TemplateData = {
 	Coins = 0;
-	Str = "Value";
-	Temp = {
-		["Cool"] = "My Data"
-	}
 }
 
 local DatastoreOptions = {
@@ -156,25 +150,9 @@ end
 
 ]]
 
-local print = function(...) local vargs = "" for _, arg in {...} do 
-		if typeof(arg) == "table" then print(script.Name.." [Table]:", arg) else vargs = vargs..tostring(arg).." " end end if vargs ~= "" then return print(script.Name..": "..vargs)
-	end
-end
-
-local warn = function(...) local vargs = "" for _, arg in {...} do 
-		if typeof(arg) == "table" then warn(script.Name.." [Table]:", arg) else vargs = vargs..tostring(arg).." " end end if vargs ~= "" then return print(script.Name..": "..vargs)
-	end
-end
-
-local error = function(...) local vargs = "" for _, arg in {...} do 
-		if typeof(arg) == "table" then error(script.Name.." [Table]:", arg) else vargs = vargs..tostring(arg).." " end end if vargs ~= "" then return print(script.Name..": "..vargs)
-	end
-end
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DatastoreService = game:GetService("DataStoreService")
 local TextService = game:GetService("TextService")
-local HTTPService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
@@ -182,6 +160,16 @@ local DataCacher = {}
 DataCacher.__index = DataCacher
 
 --------------------------------------
+
+--// The total time, in seconds, for a session to be expired for other entries to use the session
+local SESSION_LOCK_TIMEOUT: number = 30 * 60
+
+--// The time, in seconds, for data to be saved and for a new session key to be generated to prevent expiration 
+-->> *MUST BE LOWER THAN SESSION_LOCK_TIMEOUT*
+local AUTO_SAVE_INTERVAL: number = 5 * 60
+
+--// The message that is displayed when the player is kicked from having an active session
+local SESSION_KICK_MESSAGE: string = "A session was already loaded! Please rejoin later."
 
 --// The total decimal places to round for
 local DECIMAL_PLACES: number = 3
@@ -201,17 +189,8 @@ local TemplateOptions = {
 	--// Creates a signal that are tasked to listen to when data is modified, loaded or released
 	CreateListeners = false;
 
-	--// Pauses the current thread if the 'GET' or 'UPDATE' asynchronous calls exceeds the limit (60 + numOfPlayers * 10)
-	ThrottleRequests = false;
-
 	--// Compresses/Rounds floating point numbers (like 3.142) to the nearest ('x') decimal places
 	CompressFloatNumbers = false;
-
-	--// Auto saves the player's data every few minutes (used to prevent data loss)
-	AutoSaving = false;
-
-	--// The duration (in minutes) for the auto save to occur (number must be >= 1)
-	AutoSavingDuration = 5;
 
 	--// Filters out the strings that are in the player's data when it is loaded
 	FilterStringContent = false;
@@ -234,9 +213,6 @@ local TemplateOptions = {
 	--// The name for the RemoteEvent ('AllowClientSideToRead')
 	ClientSideAgent = "DataCacherRemote";
 
-	--// If true, data will be saved inside Roblox Studio
-	SaveInStudio = false;
-
 	--// If data fails to save/load, it will retry for a specified amount of attempts before it is considered to be a failure
 	RecursiveCalls = true;
 
@@ -255,13 +231,9 @@ export type DatastoreOptions = {
 	TemplateData: {}?;
 
 	CreateListeners: boolean?;
-	ThrottleRequests: boolean?;
 	CompressFloatNumbers: boolean?;
-	AutoSaving: boolean?;
-	AutoSavingDuration: number?;
 	FilterStringContent: boolean?;
 	AllowClientSideToRead: boolean?;
-	SaveInStudio: boolean?;
 	RecursiveCalls: boolean?;
 
 	FilterStringContentOptions: {
@@ -276,14 +248,20 @@ export type DatastoreOptions = {
 }
 
 if RunService:IsClient() then
-	return error("Module cannot be required by the client!")
+	error(`[{script.Name}]: Module cannot be required by the client!`)
 end
 
 local Globals
 do
 	Globals = {
 		ClientRemote = nil;
+		DecimalPlace = nil;
+
 		RegisteredDataStores = {};
+		ReadWriteLimits = {
+			GET = nil;
+			UPDATE = nil;
+		};
 	}
 
 	local decimal_place = DECIMAL_PLACES
@@ -305,24 +283,21 @@ do
 	end
 
 	Globals.Reconcile = function(tab: {}, template: {})
-		local function reconcileTable(t, tt)
-			local reconciledTable = Globals.Duplicate(tt)
-			for index, value in t do
-				if reconciledTable[index] ~= nil then
-					if typeof(value) == "table" then
-						reconciledTable[index] = reconcileTable(value, reconciledTable[index])
-					else
-						reconciledTable[index] = value
-					end
+		local newTable = tab
+		for k, v in template do
+			if type(k) ~= "string" then continue end
+			if newTable[k] == nil then
+				if type(v) == "table" then
+					newTable[k] = Globals.Duplicate(v)
 				else
-					reconciledTable[index] = value
+					newTable[k] = v
 				end
 			end
-			return reconciledTable
+			if type(newTable[k]) == "table" and type(v) == "table" then
+				Globals.Reconcile(newTable[k], v)
+			end
 		end
-
-		local reconciledTable = reconcileTable(tab, template)
-		return reconciledTable
+		return newTable
 	end
 
 	Globals.Duplicate = function(t: {})
@@ -432,20 +407,20 @@ local function loopTableWithValuesAsDefault(t, callback)
 end
 
 local function checkForArguments(options: DatastoreOptions)
-	if options.AutoSaving and options.AutoSavingDuration < 1 then
-		return error("AutoSavingDuration cannot be less than 1 minute!")
-	end
-
 	if options.RecursiveCalls then
 		if options.CallAttempts < 1 then
-			return error("CallAttempts cannot be less than 1 attempt(s)!")
+			error(`[{script.Name}]: CallAttempts cannot be less than 1 attempt(s)!`)
 		else
 			local totalDuration = options.RetryCallDelay * options.CallAttempts
 			if totalDuration >= 30 then
-				return error("CallAttempts exceeded more than 29 seconds!")
+				error(`[{script.Name}]: CallAttempts exceeded for more than 30 seconds!`)
 			end
 		end
 	end
+end
+
+local function isInTheSameSession(session)
+	return session.PlaceId == game.PlaceId and session.JobId == game.JobId
 end
 
 local function getRequestsLimit()
@@ -497,34 +472,40 @@ function DataCacher.CreateDatastore(DatastoreKey: string, DatastoreOptions: Data
 			name = DatastoreKey,
 			options = options,
 
-			playerData = {},
+			is_shutting_down = false,
+
+			player_data = {},
+			kicked_players = {},
+			auto_save = {},
+			loaded_players = {},
+
 			events = {},
 			changed = {},
-			auto_save = {},
-			requests = {},
+
+			operations = {
+				write = {},
+			},
 
 			datastore = DatastoreService:GetDataStore(DatastoreKey),
 		},
 	}
 
 	self.__raw.waitForThrottle = function(method)
-		if options.ThrottleRequests then
-			if not self.__raw.requests[method] then
-				self.__raw.requests[method] = {
-					requests = 1;
-					timer = task.spawn(function()
-						task.wait(1 * 60) while true do
-							self.__raw.requests[method].requests = 0
-							task.wait(1 * 60)
-						end
-					end)
-				}
-			else
-				self.__raw.requests[method].requests += 1
-				if self.__raw.requests[method].requests > getRequestsLimit() then
-					repeat RunService.Heartbeat:Wait()
-					until self.__raw.requests[method].requests <= getRequestsLimit()
-				end
+		if not Globals.ReadWriteLimits[method] then
+			Globals.ReadWriteLimits[method] = {
+				requests = 1;
+				timer = task.spawn(function()
+					task.wait(1 * 60) while true do
+						Globals.ReadWriteLimits[method].requests = 0
+						task.wait(1 * 60)
+					end
+				end)
+			}
+		else
+			Globals.ReadWriteLimits[method].requests += 1
+			if Globals.ReadWriteLimits[method].requests > getRequestsLimit() then
+				repeat RunService.Heartbeat:Wait()
+				until Globals.ReadWriteLimits[method].requests <= getRequestsLimit()
 			end
 		end
 	end
@@ -550,15 +531,15 @@ function DataCacher.CreateDatastore(DatastoreKey: string, DatastoreOptions: Data
 
 	self.__raw.addChangeSpeaker = function(player: Player)
 		if options.CreateListeners and self.__raw.events["Changed"] then
-			if self.__raw.playerData[player] and not self.__raw.changed[player] then
-				local previousData = Globals.Duplicate(self.__raw.playerData[player].data)
+			if self.__raw.player_data[player] and not self.__raw.changed[player] then
+				local previous_data = Globals.Duplicate(self.__raw.player_data[player].data)
 				self.__raw.changed[player] = RunService.Heartbeat:Connect(function()
-					local newData = self.__raw.playerData[player]
-					newData = newData and newData.data
+					local new_data = self.__raw.player_data[player]
+					new_data = new_data and new_data.data
 
-					if newData and not Globals.IsTableIdentical(previousData, newData) then
-						self.__raw.fire("Changed", player, previousData, newData)
-						previousData = Globals.Duplicate(newData)
+					if new_data and not Globals.IsTableIdentical(previous_data, new_data) then
+						self.__raw.fire("Changed", player, previous_data, new_data)
+						previous_data = Globals.Duplicate(new_data)
 					end
 				end)
 			end
@@ -573,25 +554,29 @@ end
 
 function DataCacher.GetRegisteredDatastore(DatastoreKey: string, Timeout: number?)
 	if not Globals.RegisteredDataStores[DatastoreKey] then
-		local timeNow = os.time()
+		local time_now = os.clock()
 		Timeout = Timeout or math.huge
 
 		repeat
 			local tab = Globals.RegisteredDataStores[DatastoreKey]
 			RunService.Heartbeat:Wait()
-		until tab or (os.time() - timeNow) >= Timeout
+		until tab or (os.clock() - time_now) >= Timeout
 	end
 
 	return Globals.RegisteredDataStores[DatastoreKey]
 end
 
-function DataCacher:Load(player: Player, MigratedData: {}?): {}
-	if self.__raw.playerData[player] then
+function DataCacher:Load(player: Player, MigratedData: {}?): {}?
+	if self.__raw.player_data[player] then
+		return
+	end
+
+	if self.__raw.is_shutting_down then
 		return
 	end
 
 	local key = getPlayerKey(player, self.__raw.options.Key)
-	local function UpdateAsynchronous()
+	local function updateAsynchronous()
 		local success, result = pcall(function()
 			self.__raw.waitForThrottle("GET")
 			return self.__raw.datastore:GetAsync(key)
@@ -599,10 +584,10 @@ function DataCacher:Load(player: Player, MigratedData: {}?): {}
 		return success, result
 	end
 
-	local success, result = UpdateAsynchronous()
+	local success, result = updateAsynchronous()
 	if self.__raw.options.RecursiveCalls and not success then
 		for _ = 1, self.__raw.options.CallAttempts do
-			success, result = UpdateAsynchronous()
+			success, result = updateAsynchronous()
 			if success then 
 				break 
 			end
@@ -612,15 +597,24 @@ function DataCacher:Load(player: Player, MigratedData: {}?): {}
 	end
 
 	if result and result.data then
+		if result.Session then
+			if result.Session.Active and not isInTheSameSession(result.Session) then
+				local difference = os.time() - result.Session.Timestamp
+				if difference < SESSION_LOCK_TIMEOUT then
+					return player:Kick(SESSION_KICK_MESSAGE)
+				end
+			end
+		end
+
 		local data = self.__raw.options.FilterStringContent and loopTableWithValuesAsDefault(result.data, function(value, index)
 			if typeof(index) == "string" and typeof(value) == "string" then
-				local filteringOptions = self.__raw.options.FilterStringContentOptions
-				if filteringOptions.WhiteListEnabled then
-					if table.find(filteringOptions.StringIndexList, index) then
+				local filtering_options = self.__raw.options.FilterStringContentOptions
+				if filtering_options.WhiteListEnabled then
+					if table.find(filtering_options.StringIndexList, index) then
 						return Globals.FilterText(player, value)
 					end
-				elseif filteringOptions.BlackListEnabled then
-					if not table.find(filteringOptions.StringIndexList, index) then
+				elseif filtering_options.BlackListEnabled then
+					if not table.find(filtering_options.StringIndexList, index) then
 						return Globals.FilterText(player, value)
 					end
 				else
@@ -638,14 +632,31 @@ function DataCacher:Load(player: Player, MigratedData: {}?): {}
 		existing_data = Globals.Reconcile(MigratedData, self.__raw.options.TemplateData)
 	end
 
-	self.__raw.playerData[player] = result or {data = existing_data or self.__raw.options.TemplateData}
-	self.__raw.playerData[player]["LastJoined"] = os.time()
+	self.__raw.player_data[player] = result or {data = existing_data or self.__raw.options.TemplateData}
+	self.__raw.player_data[player]["LastJoined"] = os.time()
+	self.__raw.player_data[player]["Version"] = self.__raw.player_data[player]["Version"] or 1
+	self.__raw.player_data[player]["Session"] = self.__raw.player_data[player]["Session"] or {}
 
+	self.__raw.player_data[player]["Session"].Active = true
+	self.__raw.player_data[player]["Session"].JobId = self.__raw.player_data[player]["Session"].JobId or game.JobId
+	self.__raw.player_data[player]["Session"].PlaceId = self.__raw.player_data[player]["Session"].PlaceId or game.PlaceId
+	self.__raw.player_data[player]["Session"].Timestamp = self.__raw.player_data[player]["Session"].Timestamp or os.time()
+
+	if not isInTheSameSession(self.__raw.player_data[player]["Session"]) then
+		local difference = os.time() - self.__raw.player_data[player]["Session"].Timestamp
+		if difference >= SESSION_LOCK_TIMEOUT then
+			self.__raw.player_data[player]["Session"].JobId = game.JobId
+			self.__raw.player_data[player]["Session"].PlaceId = game.PlaceId
+			self.__raw.player_data[player]["Session"].Timestamp = os.time()
+		end
+	end
+
+	self:Save(player, nil, true)
 	self.__raw.addChangeSpeaker(player)
 
-	if self.__raw.options.AutoSaving and not self.__raw.auto_save[player] then
+	if not self.__raw.auto_save[player] then
 		self.__raw.auto_save[player] = task.spawn(function()
-			local auto_saving_duration = self.__raw.options.AutoSavingDuration * 60
+			local auto_saving_duration = AUTO_SAVE_INTERVAL
 			task.wait(auto_saving_duration)
 
 			while player and player:IsDescendantOf(game) do				
@@ -655,20 +666,39 @@ function DataCacher:Load(player: Player, MigratedData: {}?): {}
 		end)
 	end
 
-	self.__raw.fire("Loaded", player, self.__raw.playerData[player]["data"])
-	return self.__raw.playerData[player]["data"]
+	self.__raw.fire("Loaded", player, self.__raw.player_data[player]["data"])
+	self.__raw.loaded_players[player] = true
+
+	return self.__raw.player_data[player]["data"]
 end
 
-function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> nil?, AutoSaving: boolean?): boolean
-	if not self.__raw.playerData[player] then
+function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> {}?, AutoSaving: boolean?): boolean
+	if not self.__raw.player_data[player] then
 		return
 	end
 
 	local key = getPlayerKey(player, self.__raw.options.Key)
-	local data = Globals.Duplicate(self.__raw.playerData[player])
+	local data = Globals.Duplicate(self.__raw.player_data[player])
 
 	data["LastLeft"] = not AutoSaving and os.time() or data["LastLeft"]
 	data["Version"] = data.Version or 1
+
+	if not AutoSaving then	
+		self.__raw.player_data[player] = nil
+		if self.__raw.changed[player] then
+			self.__raw.changed[player]:Disconnect()
+			self.__raw.changed[player] = nil
+		end
+
+		if self.__raw.auto_save[player] then
+			task.cancel(self.__raw.auto_save[player])
+			self.__raw.auto_save[player] = nil
+		end
+
+		if not table.find(self.__raw.operations.write, player.UserId) then
+			table.insert(self.__raw.operations.write, player.UserId)
+		end
+	end
 
 	if self.__raw.options.CompressFloatNumbers then
 		data = loopTableWithValuesAsDefault(data, function(value)
@@ -679,48 +709,46 @@ function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> ni
 		end)
 	end
 
-	if not AutoSaving then	
-		self.__raw.playerData[player] = nil
-		if self.__raw.changed[player] then
-			self.__raw.changed[player]:Disconnect()
-			self.__raw.changed[player] = nil
-		end
-
-		if self.__raw.auto_save[player] then
-			task.cancel(self.__raw.auto_save[player])
-			self.__raw.auto_save[player] = nil
-		end
-	end
-
-	local function UpdateAsynchronous()
+	local function updateAsynchronous()
 		local success, err = pcall(function()
-			if RunService:IsStudio() and not self.__raw.options.SaveInStudio then
-				return
-			end
+			local is_kicked = self.__raw.kicked_players[player]
 
 			self.__raw.waitForThrottle("UPDATE")
-			self.__raw.datastore:UpdateAsync(key, Callback or function(oldData: {})
-				local previousData = oldData or data
-				previousData["Version"] = previousData.Version or 1
+			self.__raw.datastore:UpdateAsync(key, function(oldData: {})
+				local previous_data = oldData or {}
+				previous_data["Version"] = previous_data.Version or 1
+
+				if is_kicked or data.Version ~= previous_data.Version then
+					return nil
+				end
+
+				if Callback then
+					return Callback(data, oldData)
+				end
 
 				if AutoSaving then
+					data.Session.Timestamp = os.time()
 					return data
-				end
-
-				if data.Version == previousData.Version then
+				else
 					data.Version += 1
+
+					data.Session.Active = false
+					data.Session.JobId = nil
+					data.Session.PlaceId = nil
+					data.Session.Timestamp = nil
+
 					return data
 				end
-				return nil
 			end)
 		end)
+
 		return success, err
 	end
 
-	local success, err = UpdateAsynchronous()
+	local success, err = updateAsynchronous()
 	if self.__raw.options.RecursiveCalls and not success then
 		for _ = 1, self.__raw.options.CallAttempts do
-			success, err = UpdateAsynchronous()
+			success, err = updateAsynchronous()
 			if success then 
 				break 
 			end
@@ -729,19 +757,55 @@ function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> ni
 		end
 	end
 
-	if not AutoSaving then self.__raw.fire("Released", player) end
+	if not AutoSaving then
+		self.__raw.kicked_players[player] = nil
+		self.__raw.loaded_players[player] = nil
+		self.__raw.fire("Released", player) 
+
+		table.remove(self.__raw.operations.write, table.find(
+			self.__raw.operations.write, player.UserId)
+		)
+	end
 	return success
 end
 
 function DataCacher:Get(player: Player, ViewRawData: boolean?): {}
-	return self.__raw.playerData[player] and 
-		(ViewRawData and Globals.Duplicate(self.__raw.playerData[player]) or
-			self.__raw.playerData[player]["data"])
+	return self.__raw.player_data[player] and 
+		(ViewRawData and Globals.Duplicate(self.__raw.player_data[player]) or
+			self.__raw.player_data[player]["data"])
 end
 
-function DataCacher:GetDataOffline(UserId: number): {}?
+function DataCacher:Wipe(player: Player)
+	if self.__raw.player_data[player] then
+		local session = self.__raw.player_data[player]["Session"] or {}
+
+		self.__raw.player_data[player] = {data = self.__raw.options.TemplateData}
+		self.__raw.player_data[player]["LastJoined"] = os.time()
+		self.__raw.player_data[player]["LastLeft"] = nil
+		self.__raw.player_data[player]["Version"] = 1
+		self.__raw.player_data[player]["Session"] = session
+
+		local success, err = pcall(function()
+			local key = getPlayerKey(player.UserId, self.__raw.options.Key)
+			self.__raw.datastore:SetAsync(key, self.__raw.player_data[player])
+		end)
+
+		session = nil
+		self.__raw.fire("Wiped", player)
+	end
+end
+
+function DataCacher:GetDataAsync(UserId: number): {}?
 	local key = getPlayerKey(UserId, self.__raw.options.Key)
 	local success, result = pcall(function()
+		local player_in_game = Players:GetPlayerByUserId(UserId)
+		if player_in_game then
+			local fetched_data = self.__raw.player_data[player_in_game]
+			if fetched_data then
+				return fetched_data
+			end
+		end
+
 		self.__raw.waitForThrottle("GET")
 		return self.__raw.datastore:GetAsync(key)
 	end)
@@ -749,48 +813,23 @@ function DataCacher:GetDataOffline(UserId: number): {}?
 	return result and Globals.Duplicate(result)
 end
 
-function DataCacher:SaveDataOffline(UserId: number, Data: {}): boolean
+function DataCacher:SaveDataAsync(UserId: number, Data: {}, ForceSave: boolean?): boolean
 	local key = getPlayerKey(UserId, self.__raw.options.Key)
 	local success, result = pcall(function()
-		self.__raw.waitForThrottle("UPDATE")
-		self.__raw.datastore:UpdateAsync(key, function(...)
-			return Data
-		end)
-	end)
-	return success
-end
-
-function DataCacher:Wipe(player: Player)
-	if self.__raw.playerData[player] then
-		self.__raw.playerData[player] = {data = self.__raw.options.TemplateData}
-		self.__raw.playerData[player]["LastJoined"] = os.time()
-		self.__raw.playerData[player]["LastLeft"] = nil
-		self.__raw.playerData[player]["Version"] = 1
-
-		if not RunService:IsStudio() or self.__raw.options.SaveInStudio then
-			local success, err = pcall(function()
-				local key = getPlayerKey(player.UserId, self.__raw.options.Key)
-				self.__raw.datastore:SetAsync(key, self.__raw.playerData[player])
-			end)
-
-			if not success then
-				warn("Error when wiping: "..err)
+		if not ForceSave then
+			local latest_data = self:GetDataAsync(UserId)
+			if latest_data.Session and latest_data.Session.Active then
+				return false
 			end
 		end
 
-		self.__raw.fire("Wiped", player)
-	end
-end
+		self.__raw.waitForThrottle("UPDATE")
+		self.__raw.datastore:SetAsync(key, Data)
 
-function DataCacher:View(player: Player)
-	local data = self:Get(player)
-	if data then
-		handleNestedTableWithOperation(data, function(index, value)
-			print(("%s's Data: [Index] = %s | [Value] = %s"):format(
-				player.Name, tostring(index), tostring(value)
-				))
-		end)
-	end
+		return true
+	end)
+
+	return success and result
 end
 
 function DataCacher:GetListener(ListenerType: Listeners, Callback: (player: Player, ...any) -> nil)
@@ -846,15 +885,99 @@ function DataCacher:ClearListeners()
 	end
 end
 
-function DataCacher:GetDataSizeInBytes(player: Player): (number, boolean)
-	local data = self.__raw.playerData[player]
-	if data then
-		local maxSize = 4 * (10 ^ 6)
-		local size = #HTTPService:JSONEncode(data)
-
-		return size, size >= maxSize
-	end
+function DataCacher:GetDatastoreObject(): DataStore
+	return self.__raw.datastore
 end
+
+local last_thread_running, active_threads = false, {}
+local hb_request_calls, hb_success_calls = 0, 0
+
+RunService.Heartbeat:Connect(function()
+	if last_thread_running then return end
+	last_thread_running = true
+
+	for key, _ in Globals.RegisteredDataStores do
+		local datastore = DataCacher.GetRegisteredDatastore(key, 1)
+		if datastore then
+			for user_key, user_data in active_threads do
+				if not user_data.is_alive then
+					if user_data.thread then
+						task.cancel(user_data.thread)
+					end
+
+					user_data.thread = nil
+					active_threads[user_key] = nil
+				end
+			end
+
+			if datastore.__raw.is_shutting_down then
+				continue
+			end
+
+			for _, player in Players:GetPlayers() do
+				local data = datastore.__raw.player_data[player]
+				if data then
+					if data.Session.Active and not isInTheSameSession(data.Session) then
+						if not datastore.__raw.loaded_players[player] then
+							continue
+						end
+
+						if table.find(datastore.__raw.operations.write, player.UserId) then
+							continue
+						end
+
+						datastore.__raw.kicked_players[player] = true
+						player:Kick(SESSION_KICK_MESSAGE)
+
+						continue
+					end
+				end
+			end
+
+			for player: Player in datastore.__raw.player_data do
+				local user_key = key..player.UserId
+				if player and player:IsDescendantOf(game) then 
+					continue
+				end
+
+				if not active_threads[user_key] then
+					active_threads[user_key] = {
+						is_alive = true,
+					}
+
+					active_threads[user_key].thread = task.spawn(function()
+						local burner_timeout = os.clock()
+						if table.find(datastore.__raw.operations.write, player.UserId) then
+							local max_burner_timeout = 1 * 60
+							while true do
+								if os.clock() - burner_timeout >= max_burner_timeout then
+									break
+								end
+								RunService.Heartbeat:Wait()
+							end
+						end
+
+						if not (player and player:IsDescendantOf(game)) then
+							local latest_data = datastore:GetDataAsync(player.UserId)
+							if latest_data.Session.Active and not isInTheSameSession(latest_data.Session) then
+								datastore.__raw.kicked_players[player] = true
+							end
+
+							hb_request_calls += 1
+
+							datastore:Save(player)
+							hb_success_calls += 1
+						end
+
+						active_threads[user_key].is_alive = false
+					end)
+				end	
+			end
+		end
+	end
+
+	last_thread_running = false
+end)
 
 game:BindToClose(function()
 	local total_requests_needed = 0
@@ -863,9 +986,7 @@ game:BindToClose(function()
 	for key, _ in Globals.RegisteredDataStores do
 		local datastore = DataCacher.GetRegisteredDatastore(key, 1)
 		if datastore then
-			if RunService:IsStudio() and not datastore.__raw.options.SaveInStudio then
-				continue
-			end
+			datastore.__raw.is_shutting_down = true
 
 			for _, player in Players:GetPlayers() do
 				total_requests_needed += 1
@@ -877,7 +998,7 @@ game:BindToClose(function()
 		end
 	end
 
-	while requests_made ~= total_requests_needed do
+	while (requests_made ~= total_requests_needed or hb_request_calls ~= hb_success_calls) do
 		RunService.Heartbeat:Wait()
 	end
 end)
