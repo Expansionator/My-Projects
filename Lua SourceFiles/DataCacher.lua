@@ -64,14 +64,14 @@ Datastore:SaveDataAsync(UserId: number, Data: {}, ForceSave: boolean?): boolean
 > Returns: Success: boolean
 
 Datastore:GetListener(ListenerType: Listeners, Callback: (player: Player, ...any) -> nil)
-> Description: Listens to when the player's data is added, modified or removed
+> Description: Listens to when the player's data is added, modified, removed, wiped or auto-saved
 > Returns: nil | void
-> Methods [Listener Type]: Changed | Loaded | Released | Wiped
+> Methods [Listener Type]: Changed | Loaded | Released | Wiped | AutoSave
 
 Datastore:RemoveListener(ListenerType: Listeners)
 > Description: Stops listening to an existing active listener
 > Returns: nil | void
-> Methods [Listener Type]: Changed | Loaded | Released | Wiped
+> Methods [Listener Type]: Changed | Loaded | Released | Wiped | AutoSave
 
 Datastore:ClearListeners()
 > Description: Similar to RemoveListener(), except that it's for all listener types
@@ -133,6 +133,10 @@ end)
 
 Datastore:GetListener("Released", function(player: Player)
 	print(player.Name.."'s data has now been removed!")
+end)
+
+Datastore:GetListener("AutoSave", function(player: Player)
+	print(player.Name.."'s data was auto-saved!")
 end)
 
 while true do
@@ -476,7 +480,6 @@ function DataCacher.CreateDatastore(DatastoreKey: string, DatastoreOptions: Data
 
 			player_data = {},
 			kicked_players = {},
-			auto_save = {},
 			loaded_players = {},
 
 			events = {},
@@ -654,18 +657,6 @@ function DataCacher:Load(player: Player, MigratedData: {}?): {}?
 	self:Save(player, nil, true)
 	self.__raw.addChangeSpeaker(player)
 
-	if not self.__raw.auto_save[player] then
-		self.__raw.auto_save[player] = task.spawn(function()
-			local auto_saving_duration = AUTO_SAVE_INTERVAL
-			task.wait(auto_saving_duration)
-
-			while player and player:IsDescendantOf(game) do				
-				self:Save(player, nil, true)
-				task.wait(auto_saving_duration)
-			end
-		end)
-	end
-
 	self.__raw.fire("Loaded", player, self.__raw.player_data[player]["data"])
 	self.__raw.loaded_players[player] = true
 
@@ -690,11 +681,6 @@ function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> {}
 			self.__raw.changed[player] = nil
 		end
 
-		if self.__raw.auto_save[player] then
-			task.cancel(self.__raw.auto_save[player])
-			self.__raw.auto_save[player] = nil
-		end
-
 		if not table.find(self.__raw.operations.write, player.UserId) then
 			table.insert(self.__raw.operations.write, player.UserId)
 		end
@@ -714,8 +700,8 @@ function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> {}
 			local is_kicked = self.__raw.kicked_players[player]
 
 			self.__raw.waitForThrottle("UPDATE")
-			self.__raw.datastore:UpdateAsync(key, function(oldData: {})
-				local previous_data = oldData or {}
+			self.__raw.datastore:UpdateAsync(key, function(latest_data: {})
+				local previous_data = latest_data or {}
 				previous_data["Version"] = previous_data.Version or 1
 
 				if is_kicked or data.Version ~= previous_data.Version then
@@ -723,10 +709,16 @@ function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> {}
 				end
 
 				if Callback then
-					return Callback(data, oldData)
+					return Callback(data, previous_data)
 				end
 
 				if AutoSaving then
+					if previous_data.Session and not previous_data.Session.Active then
+						data.Session.Active = true
+						data.Session.JobId = game.JobId
+						data.Session.PlaceId = game.PlaceId
+					end
+
 					data.Session.Timestamp = os.time()
 					return data
 				else
@@ -839,6 +831,7 @@ function DataCacher:GetListener(ListenerType: Listeners, Callback: (player: Play
 			["Loaded"] = true;
 			["Released"] = true;
 			["Wiped"] = true;
+			["AutoSave"] = true;
 		}
 
 		if validListeners[ListenerType] then
@@ -891,6 +884,7 @@ end
 
 local last_thread_running, active_threads = false, {}
 local hb_request_calls, hb_success_calls = 0, 0
+local auto_save_datastores = {}
 
 RunService.Heartbeat:Connect(function()
 	if last_thread_running then return end
@@ -899,6 +893,23 @@ RunService.Heartbeat:Connect(function()
 	for key, _ in Globals.RegisteredDataStores do
 		local datastore = DataCacher.GetRegisteredDatastore(key, 1)
 		if datastore then
+			if not auto_save_datastores[key] then
+				auto_save_datastores[key] = {}
+			end
+
+			for user_id in auto_save_datastores[key] do
+				local found_player = Players:GetPlayerByUserId(user_id)
+				if not found_player then
+					if auto_save_datastores[key][user_id].thread then
+						task.cancel(auto_save_datastores[key][user_id].thread)
+						auto_save_datastores[key][user_id].thread = nil
+					end
+
+					auto_save_datastores[key][user_id].temp_data = nil
+					auto_save_datastores[key][user_id] = nil
+				end
+			end
+
 			for user_key, user_data in active_threads do
 				if not user_data.is_alive then
 					if user_data.thread then
@@ -914,32 +925,62 @@ RunService.Heartbeat:Connect(function()
 				continue
 			end
 
-			for _, player in Players:GetPlayers() do
-				local data = datastore.__raw.player_data[player]
-				if data then
-					if data.Session.Active and not isInTheSameSession(data.Session) then
-						if not datastore.__raw.loaded_players[player] then
-							continue
-						end
-
-						if table.find(datastore.__raw.operations.write, player.UserId) then
-							continue
-						end
-
-						datastore.__raw.kicked_players[player] = true
-						player:Kick(SESSION_KICK_MESSAGE)
-
-						continue
-					end
-				end
-			end
-
 			for player: Player in datastore.__raw.player_data do
-				local user_key = key..player.UserId
 				if player and player:IsDescendantOf(game) then 
+					if not auto_save_datastores[key][player.UserId] then
+						auto_save_datastores[key][player.UserId] = {
+							clock = os.clock(),
+
+							emergency_bypass = false,
+
+							temp_data = nil,
+							thread = nil,
+						}
+					end
+
+					local auto_saving_duration = AUTO_SAVE_INTERVAL
+					local difference = os.clock() - auto_save_datastores[key][player.UserId].clock
+
+					if auto_save_datastores[key][player.UserId].emergency_bypass or difference >= auto_saving_duration then
+						if difference >= auto_saving_duration then
+							auto_save_datastores[key][player.UserId].clock = os.clock()
+
+							if auto_save_datastores[key][player.UserId].thread then
+								task.cancel(auto_save_datastores[key][player.UserId].thread)
+							end
+
+							auto_save_datastores[key][player.UserId].thread = task.defer(function()
+								pcall(datastore.Save, datastore, player, nil, true)
+								auto_save_datastores[key][player.UserId].thread = nil
+							end)
+
+							datastore.__raw.fire("AutoSave", player)
+						end
+
+						local latest_data = auto_save_datastores[key][player.UserId].temp_data or datastore:GetDataAsync(player.UserId)
+						if latest_data and latest_data.Session then
+							if latest_data.Session.Active and not isInTheSameSession(latest_data.Session) then
+								if table.find(datastore.__raw.operations.write, player.UserId) or not datastore.__raw.loaded_players[player] then
+									auto_save_datastores[key][player.UserId].emergency_bypass = true
+									auto_save_datastores[key][player.UserId].temp_data = 
+										auto_save_datastores[key][player.UserId].temp_data or latest_data
+
+									continue
+								end
+
+								auto_save_datastores[key][player.UserId].emergency_bypass = false
+								auto_save_datastores[key][player.UserId].temp_data = nil
+
+								datastore.__raw.kicked_players[player] = true
+								player:Kick(SESSION_KICK_MESSAGE)
+							end
+						end
+					end
+
 					continue
 				end
 
+				local user_key = key..player.UserId
 				if not active_threads[user_key] then
 					active_threads[user_key] = {
 						is_alive = true,
