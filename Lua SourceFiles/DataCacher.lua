@@ -53,14 +53,14 @@ Datastore:Wipe(player: Player)
 > Returns: nil | void
 
 Datastore:GetDataAsync(UserId: number): {}
-> Description: Returns a duplicate of the player's saved data (if any), which can be saved (offline) later
+> Description: Returns a duplicate of the player's saved or used data (if any), which can be saved (via SaveDataAsync()) later
 > Returns: Data: {}
 
 Datastore:SaveDataAsync(UserId: number, Data: {}, ForceSave: boolean?): boolean
 > Description: Saves the provided data using SetAsync, preferably data from GetDataAsync()
 > Notes: This function will not save if there is already a session active
 		 If ForceSave is true, data will be saved regardless if there is an active session
-		 	This *will* result in data loss if the session is active
+		 This *would* result in data loss if the session is active
 > Returns: Success: boolean
 
 Datastore:GetListener(ListenerType: Listeners, Callback: (player: Player, ...any) -> nil)
@@ -227,7 +227,7 @@ local TemplateOptions = {
 	RetryCallDelay = 1;
 }
 
-export type Listeners = "Changed" | "Loaded" | "Released" | "Wiped"
+export type Listeners = "Changed" | "Loaded" | "Released" | "Wiped" | "AutoSave"
 export type DatastoreOptions = {
 	Key: string?;
 	ClientSideAgent: string?;
@@ -251,8 +251,15 @@ export type DatastoreOptions = {
 	RetryCallDelay: number?;
 }
 
-if RunService:IsClient() then
-	error(`[{script.Name}]: Module cannot be required by the client!`)
+local g_header = `[{script.Name}]: `
+do
+	if RunService:IsClient() then
+		error(g_header.."Module cannot be required by the client!")
+	end
+	
+	if AUTO_SAVE_INTERVAL >= SESSION_LOCK_TIMEOUT then
+		error(g_header.."AUTO_SAVE_INTERVAL cannot be more than SESSION_LOCK_TIMEOUT!")
+	end
 end
 
 local Globals
@@ -297,6 +304,7 @@ do
 					newTable[k] = v
 				end
 			end
+			
 			if type(newTable[k]) == "table" and type(v) == "table" then
 				Globals.Reconcile(newTable[k], v)
 			end
@@ -413,11 +421,11 @@ end
 local function checkForArguments(options: DatastoreOptions)
 	if options.RecursiveCalls then
 		if options.CallAttempts < 1 then
-			error(`[{script.Name}]: CallAttempts cannot be less than 1 attempt(s)!`)
+			error(g_header.."CallAttempts cannot be less than 1 attempt(s)!")
 		else
 			local totalDuration = options.RetryCallDelay * options.CallAttempts
 			if totalDuration >= 30 then
-				error(`[{script.Name}]: CallAttempts exceeded for more than 30 seconds!`)
+				error(g_header.."CallAttempts exceeded for more than 30 seconds!")
 			end
 		end
 	end
