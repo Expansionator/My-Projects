@@ -1047,7 +1047,10 @@ game:BindToClose(function()
 		end
 	end
 
-	while (requests_made ~= total_requests_needed or hb_request_calls ~= hb_success_calls) do
+	while true do
+		if requests_made == total_requests_needed and hb_request_calls == hb_success_calls then
+			break
+		end
 		RunService.Heartbeat:Wait()
 	end
 end)
