@@ -20,6 +20,7 @@ Notes:
 	Warning: The data received will show the whole contents of the player's data
 - If 'ViewRawData' is true, you cannot modify that data
 - You can only migrate/import ('MigratedData') new data if it had not been saved
+- If datastores are not able to run, this server will not be able to use datastore methods such as GetAsync(), UpdateAsync() and SetAsync()
 
 ------------------------------------------------------
 
@@ -77,7 +78,7 @@ Datastore:ClearListeners()
 > Description: Similar to RemoveListener(), except that it's for all listener types
 > Returns: nil | void
 
-DataCacher:GetDatastoreObject(): DataStore
+DataCacher:GetDatastoreObject(): DataStore?
 > Description: Returns the actual datastore object
 > Returns: DataStore
 
@@ -181,6 +182,9 @@ local DECIMAL_PLACES: number = 3
 --// Uses this string if the text fails to filter
 local FILTERED_RESULT: string = "###?"
 
+--// Uses this datastore name to check if datastores are enabled
+local BURNER_DATASTORE_NAME = "____DS"
+
 --------------------------------------
 
 local TemplateOptions = {
@@ -251,15 +255,27 @@ export type DatastoreOptions = {
 	RetryCallDelay: number?;
 }
 
-local g_header = `[{script.Name}]: `
+local _g_header = `[{script.Name}]: `
 do
 	if RunService:IsClient() then
-		error(g_header.."Module cannot be required by the client!")
+		error(_g_header.."Module cannot be required by the client!")
 	end
-	
+
 	if AUTO_SAVE_INTERVAL >= SESSION_LOCK_TIMEOUT then
-		error(g_header.."AUTO_SAVE_INTERVAL cannot be more than SESSION_LOCK_TIMEOUT!")
+		error(_g_header.."AUTO_SAVE_INTERVAL cannot be more than SESSION_LOCK_TIMEOUT!")
 	end
+end
+
+local __is_datstores_enabled = "NO_RESPONSE"
+do
+	task.defer(function()
+		local success = pcall(function()
+			DatastoreService:GetDataStore(BURNER_DATASTORE_NAME):SetAsync(
+				BURNER_DATASTORE_NAME, os.time()
+			)
+		end)
+		__is_datstores_enabled = success
+	end)
 end
 
 local Globals
@@ -304,7 +320,7 @@ do
 					newTable[k] = v
 				end
 			end
-			
+
 			if type(newTable[k]) == "table" and type(v) == "table" then
 				Globals.Reconcile(newTable[k], v)
 			end
@@ -421,11 +437,11 @@ end
 local function checkForArguments(options: DatastoreOptions)
 	if options.RecursiveCalls then
 		if options.CallAttempts < 1 then
-			error(g_header.."CallAttempts cannot be less than 1 attempt(s)!")
+			error(_g_header.."CallAttempts cannot be less than 1 attempt(s)!")
 		else
 			local totalDuration = options.RetryCallDelay * options.CallAttempts
 			if totalDuration >= 30 then
-				error(g_header.."CallAttempts exceeded for more than 30 seconds!")
+				error(_g_header.."CallAttempts exceeded for more than 30 seconds!")
 			end
 		end
 	end
@@ -437,6 +453,20 @@ end
 
 local function getRequestsLimit()
 	return 60 + #Players:GetPlayers() * 10
+end
+
+local function isDatastoreEnabledForExperience()
+	if __is_datstores_enabled == "NO_RESPONSE" then
+		return false
+	end
+	return __is_datstores_enabled
+end
+
+local function waitForDatastoreEnabledResponse()
+	if __is_datstores_enabled == "NO_RESPONSE" then
+		repeat RunService.Heartbeat:Wait()
+		until __is_datstores_enabled ~= "NO_RESPONSE"
+	end
 end
 
 function DataCacher.CreateDatastore(DatastoreKey: string, DatastoreOptions: DatastoreOptions?)
@@ -497,9 +527,23 @@ function DataCacher.CreateDatastore(DatastoreKey: string, DatastoreOptions: Data
 				write = {},
 			},
 
-			datastore = DatastoreService:GetDataStore(DatastoreKey),
+			datastore = nil,
 		},
 	}
+
+	do
+		task.spawn(function()
+			local success, datastore = pcall(function()
+				return DatastoreService:GetDataStore(DatastoreKey)
+			end)
+
+			if success and datastore then
+				self.__raw.datastore = datastore
+				return
+			end
+			warn(_g_header.."Datastores are not able to function! Using default data for all players.")
+		end)
+	end
 
 	self.__raw.waitForThrottle = function(method)
 		if not Globals.ReadWriteLimits[method] then
@@ -564,6 +608,7 @@ function DataCacher.CreateDatastore(DatastoreKey: string, DatastoreOptions: Data
 end
 
 function DataCacher.GetRegisteredDatastore(DatastoreKey: string, Timeout: number?)
+	waitForDatastoreEnabledResponse()
 	if not Globals.RegisteredDataStores[DatastoreKey] then
 		local time_now = os.clock()
 		Timeout = Timeout or math.huge
@@ -586,11 +631,15 @@ function DataCacher:Load(player: Player, MigratedData: {}?): {}?
 		return
 	end
 
+	waitForDatastoreEnabledResponse()
+
 	local key = getPlayerKey(player, self.__raw.options.Key)
 	local function updateAsynchronous()
 		local success, result = pcall(function()
 			self.__raw.waitForThrottle("GET")
-			return self.__raw.datastore:GetAsync(key)
+			if isDatastoreEnabledForExperience() then
+				return self.__raw.datastore:GetAsync(key)
+			end
 		end)
 		return success, result
 	end
@@ -676,6 +725,8 @@ function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> {}
 		return
 	end
 
+	waitForDatastoreEnabledResponse()
+
 	local key = getPlayerKey(player, self.__raw.options.Key)
 	local data = Globals.Duplicate(self.__raw.player_data[player])
 
@@ -708,38 +759,40 @@ function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> {}
 			local is_kicked = self.__raw.kicked_players[player]
 
 			self.__raw.waitForThrottle("UPDATE")
-			self.__raw.datastore:UpdateAsync(key, function(latest_data: {})
-				local previous_data = latest_data or {}
-				previous_data["Version"] = previous_data.Version or 1
+			if isDatastoreEnabledForExperience() then
+				self.__raw.datastore:UpdateAsync(key, function(latest_data: {})
+					local previous_data = latest_data or {}
+					previous_data["Version"] = previous_data.Version or 1
 
-				if is_kicked or data.Version ~= previous_data.Version then
-					return nil
-				end
-
-				if Callback then
-					return Callback(data, previous_data)
-				end
-
-				if AutoSaving then
-					if previous_data.Session and not previous_data.Session.Active then
-						data.Session.Active = true
-						data.Session.JobId = game.JobId
-						data.Session.PlaceId = game.PlaceId
+					if is_kicked or data.Version ~= previous_data.Version then
+						return nil
 					end
 
-					data.Session.Timestamp = os.time()
-					return data
-				else
-					data.Version += 1
+					if Callback then
+						return Callback(data, previous_data)
+					end
 
-					data.Session.Active = false
-					data.Session.JobId = nil
-					data.Session.PlaceId = nil
-					data.Session.Timestamp = nil
+					if AutoSaving then
+						if previous_data.Session and not previous_data.Session.Active then
+							data.Session.Active = true
+							data.Session.JobId = game.JobId
+							data.Session.PlaceId = game.PlaceId
+						end
 
-					return data
-				end
-			end)
+						data.Session.Timestamp = os.time()
+						return data
+					else
+						data.Version += 1
+
+						data.Session.Active = false
+						data.Session.JobId = nil
+						data.Session.PlaceId = nil
+						data.Session.Timestamp = nil
+
+						return data
+					end
+				end)
+			end
 		end)
 
 		return success, err
@@ -770,12 +823,14 @@ function DataCacher:Save(player: Player, Callback: (data: {}, oldData: {}) -> {}
 end
 
 function DataCacher:Get(player: Player, ViewRawData: boolean?): {}
+	waitForDatastoreEnabledResponse()
 	return self.__raw.player_data[player] and 
 		(ViewRawData and Globals.Duplicate(self.__raw.player_data[player]) or
 			self.__raw.player_data[player]["data"])
 end
 
 function DataCacher:Wipe(player: Player)
+	waitForDatastoreEnabledResponse()
 	if self.__raw.player_data[player] then
 		local session = self.__raw.player_data[player]["Session"] or {}
 
@@ -787,7 +842,9 @@ function DataCacher:Wipe(player: Player)
 
 		local success, err = pcall(function()
 			local key = getPlayerKey(player.UserId, self.__raw.options.Key)
-			self.__raw.datastore:SetAsync(key, self.__raw.player_data[player])
+			if isDatastoreEnabledForExperience() then
+				self.__raw.datastore:SetAsync(key, self.__raw.player_data[player])
+			end
 		end)
 
 		session = nil
@@ -806,8 +863,11 @@ function DataCacher:GetDataAsync(UserId: number): {}?
 			end
 		end
 
-		self.__raw.waitForThrottle("GET")
-		return self.__raw.datastore:GetAsync(key)
+		waitForDatastoreEnabledResponse()
+		if isDatastoreEnabledForExperience() then
+			self.__raw.waitForThrottle("GET")
+			return self.__raw.datastore:GetAsync(key)
+		end
 	end)
 
 	return result and Globals.Duplicate(result)
@@ -823,10 +883,14 @@ function DataCacher:SaveDataAsync(UserId: number, Data: {}, ForceSave: boolean?)
 			end
 		end
 
-		self.__raw.waitForThrottle("UPDATE")
-		self.__raw.datastore:SetAsync(key, Data)
+		waitForDatastoreEnabledResponse()
+		if isDatastoreEnabledForExperience() then
+			self.__raw.waitForThrottle("UPDATE")
+			self.__raw.datastore:SetAsync(key, Data)
 
-		return true
+			return true
+		end
+		return false
 	end)
 
 	return success and result
@@ -886,7 +950,7 @@ function DataCacher:ClearListeners()
 	end
 end
 
-function DataCacher:GetDatastoreObject(): DataStore
+function DataCacher:GetDatastoreObject(): DataStore?
 	return self.__raw.datastore
 end
 
