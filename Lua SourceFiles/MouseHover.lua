@@ -13,8 +13,6 @@ Notes:
 - All callback functions yield when reinvoking events
 - This module is recommended to be placed in ReplicatedStorage, or any services that does not destroy/respawn this module
 - :OnMouseMove() runs only when the mouse has entered the Gui object
-- 'ExcludeActiveObjects' if set to true, will ignore all Gui objects that are active such as a TextButton and Functions will not execute if the game is currently being processed (such as Chat)
-- 'HandleSuddenTouchLoss' if set to true, will call all cached callbacks that used the function :OnMouseLeave() when the user stops touching a Gui object while in the hovering state
 - This module only works with touch-enabled and/or mouse-enabled devices
 
 -----------------------------------------
@@ -22,7 +20,7 @@ Notes:
 Usage:
 --> Functions
 
-MouseHover.Listen(GuiObject: GuiBase2d, ExcludeActiveObjects: boolean?, HandleSuddenTouchLoss: boolean?)
+MouseHover.Listen(GuiObject: GuiBase2d)
 > Description: Constructs the main handler which consists of events and functions
 > Returns: Mouse: {@metatable}
 
@@ -79,11 +77,8 @@ end)
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
 
-assert(RunService:IsClient(), "Module cannot be ran on the server!")
-
-local Signal --> Imported from my Signal V2 Module
+local Signal
 do
 	Signal = {__data = {registered = {}}}
 	Signal.__index = Signal
@@ -229,32 +224,26 @@ do
 		table.clear(self)
 		self.Destroyed = true
 	end
-end
+end	
 
-local MouseHover = {__vars = {}}
+local MouseHover = {}
 MouseHover.__index = MouseHover
 
 export type ScriptConnection = {
 	Disconnect: () -> nil
 }
 
-local player: Player = Players.LocalPlayer
-local guiOffset: Vector2 = GuiService:GetGuiInset()
-
 local function getMousePosition(): Vector2
+	local guiOffset = GuiService:GetGuiInset()
 	local mousePosition = UserInputService:GetMouseLocation() - guiOffset
+
 	return mousePosition
 end
 
 local function isMouseHoveringObject(gui: GuiObject, pos: Vector2): boolean
-	local playerGui: PlayerGui = player.PlayerGui
-	local guisAtPosition: {GuiObject} = playerGui:GetGuiObjectsAtPosition(pos.X, pos.Y)
-
-	local unknownGui = guisAtPosition[1]
-	if unknownGui and unknownGui == gui then
-		return true
-	end
-	return false
+	local absoluteSize, absolutePos = gui.AbsoluteSize, gui.AbsolutePosition
+	return (pos.X >= absolutePos.X and pos.X <= (absolutePos.X + absoluteSize.X)) and
+		(pos.Y >= absolutePos.Y and pos.Y <= (absolutePos.Y + absoluteSize.Y))
 end
 
 local function isDeviceCompatible(): boolean
@@ -264,11 +253,9 @@ local function isDeviceCompatible(): boolean
 	return false
 end
 
-function MouseHover.Listen(GuiObject: GuiBase2d, ExcludeActiveObjects: boolean?, HandleSuddenTouchLoss: boolean?)	
+function MouseHover.Listen(GuiObject: GuiBase2d)	
 	local self = {
 		obj = GuiObject;
-		exclude = ExcludeActiveObjects;
-		loss = HandleSuddenTouchLoss;
 
 		isHovering = false;
 
@@ -289,24 +276,27 @@ function MouseHover.Listen(GuiObject: GuiBase2d, ExcludeActiveObjects: boolean?,
 		self.mouseEnter:Fire(mousePosition.X, mousePosition.Y)
 	end
 
-	self.onMouseStopHovering = function(mousePosition: Vector2)
-		if not self.isHovering then return end
+	self.onMouseStopHovering = function(mousePosition: Vector2, forceStop: boolean)
+		if not forceStop and not self.isHovering then return end
 		self.isHovering = false
 		self.mouseLeave:Fire(mousePosition.X, mousePosition.Y)
+	end
+
+	self.onMouseMoving = function(mousePosition: Vector2)
+		if not self.isHovering then
+			return self.onMouseStopHovering(mousePosition, true)
+		end
+		self.mouseMove:Fire(mousePosition.X, mousePosition.Y)
 	end
 
 	if UserInputService.MouseEnabled then
 		self.connections["Mouse"] = UserInputService.InputChanged:Connect(function(input, gp)
 			if not isDeviceCompatible() then return end
-			if self.exclude and gp then
-				return
-			end
-
 			if input.UserInputType == Enum.UserInputType.MouseMovement then
 				local mousePosition = getMousePosition()
 				if isMouseHoveringObject(self.obj, mousePosition) then
 					self.onMouseHovering(mousePosition)
-					return self.mouseMove:Fire(mousePosition.X, mousePosition.Y)
+					return self.onMouseMoving(mousePosition)
 				end
 				self.onMouseStopHovering(mousePosition)
 			end
@@ -316,35 +306,29 @@ function MouseHover.Listen(GuiObject: GuiBase2d, ExcludeActiveObjects: boolean?,
 	if UserInputService.TouchEnabled then
 		self.connections["Touch"] = UserInputService.TouchMoved:Connect(function(touch, gp)
 			if not isDeviceCompatible() then return end
-			if self.exclude and gp then
-				return
-			end
-
 			local mousePosition = getMousePosition()
 			if isMouseHoveringObject(self.obj, mousePosition) then
 				self.onMouseHovering(mousePosition)
-				return self.mouseMove:Fire(mousePosition.X, mousePosition.Y)
+				return self.onMouseMoving(mousePosition)
 			end
 			self.onMouseStopHovering(mousePosition)
 		end)
 
-		if self.loss then
-			self.connections["TouchEnded"] = UserInputService.TouchEnded:Connect(function(input, gp)
-				if not isDeviceCompatible() then return end
-				if self.exclude and gp then
-					return
-				end
+		self.connections["TouchEnded"] = UserInputService.TouchEnded:Connect(function(input, gp)
+			if not isDeviceCompatible() then return end
 
-				local mousePosition = getMousePosition()
-				if isMouseHoveringObject(self.obj, mousePosition) then
-					self.onMouseStopHovering(mousePosition)
-				end
-			end)
-		end
+			local mousePosition = getMousePosition()
+			self.onMouseStopHovering(mousePosition)
+		end)
 	end
 
 	local metatable = setmetatable({__data = self}, MouseHover)
-	MouseHover.__vars[metatable] = metatable
+	self.connections["Destroying"] = GuiObject.Destroying:Once(function()
+		local mousePosition = getMousePosition()
+		self.onMouseStopHovering(mousePosition, true)
+
+		metatable:StopListening()
+	end)
 
 	return metatable
 end
@@ -368,7 +352,9 @@ function MouseHover:OnMouseMove(Callback: (x: number, y: number) -> nil): Script
 end
 
 function MouseHover:StopListening()
-	if not self.__data then return end
+	if not self.__data then 
+		return 
+	end
 
 	self.__data.mouseEnter:DisconnectAll()
 	self.__data.mouseLeave:DisconnectAll()
@@ -386,15 +372,5 @@ function MouseHover:StopListening()
 	table.clear(self.__data)
 	self.__data = nil
 end
-
-RunService.RenderStepped:Connect(function()
-	for index, self in MouseHover.__vars do
-		local data = self.__data
-		if data and not data.obj.Parent then
-			self:StopListening()
-			MouseHover.__vars[index] = nil
-		end
-	end
-end)
 
 return MouseHover
