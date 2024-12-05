@@ -1,4 +1,4 @@
-# My Personal Roblox Projects (ig?)
+# My Personal Projects (ig?)
 
 These are my projects that I work on for fun. If you want to use it, go ahead.\
 **These assets can have bugs! Be advised when using it.**
