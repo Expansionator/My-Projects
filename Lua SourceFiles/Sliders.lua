@@ -8,6 +8,12 @@ A module that can create custom sliders with values with an increment.
 
 ------------------------------------------------------------------
 
+Notes:
+
+- If min and max are between 0 and 1, an increment must be specified
+
+------------------------------------------------------------------
+
 Functions:
 
 Sliders.CreateSlider(container: GuiObject, slider: GuiButton, mode: "Vertical" | "Horizontal", data: Data)
@@ -16,6 +22,10 @@ Sliders.CreateSlider(container: GuiObject, slider: GuiButton, mode: "Vertical" |
 
 Sliders:ListenToSlide(callback: (value: number) -> nil)
 > Description: Binds a function and calls it when the slider is being used
+> Returns: nil | void
+
+Sliders:SetValue(value: number)
+> Description: Updates the slider to be at the specified value (value must be within min and max)
 > Returns: nil | void
 
 Sliders:GetValue()
@@ -227,7 +237,11 @@ function Sliders.CreateSlider(container: GuiObject, slider: GuiButton, mode: "Ve
 		return data.Min + value
 	end
 
-	local function updateSliderPosition(percentage)
+	self.updateSliderPosition = function(percentage)
+		if not percentage then
+			percentage = (self.value - data.Min) / range
+		end
+
 		local sliderPosition = slider.Position
 		if mode == "Horizontal" then
 			slider.Position = UDim2.new(
@@ -243,17 +257,15 @@ function Sliders.CreateSlider(container: GuiObject, slider: GuiButton, mode: "Ve
 	end
 
 	if data.DefaultValue then
-		assert(data.DefaultValue >= data.Min and data.DefaultValue <= data.Max, "Default value must be within min and max!")
 		if data.Increment then
 			assert(data.DefaultValue % data.Increment == 0, "Default value must be divisible!")
 		end
-
 
 		local percentage = (data.DefaultValue - data.Min) / range
 		local value = calculateValue(percentage)
 
 		self.value = value
-		updateSliderPosition(percentage)
+		self.updateSliderPosition(percentage)
 	end
 
 	local isHoldingDown = false
@@ -275,7 +287,7 @@ function Sliders.CreateSlider(container: GuiObject, slider: GuiButton, mode: "Ve
 				elseif mode == "Vertical" then
 					n = math.clamp(mousePosition.Y / absoluteSize.Y, 0, 1)
 				end
-				updateSliderPosition(n)
+				self.updateSliderPosition(n)
 
 				local value = calculateValue(n)
 
@@ -304,6 +316,11 @@ end
 function Sliders:ListenToSlide(callback: (value: number) -> nil)
 	if self.Destroyed then return end
 	self.__slider.onSlidingConnection:Connect(callback)
+end
+
+function Sliders:SetValue(value: number)
+	self.__slider.value = value
+	self.__slider.updateSliderPosition()
 end
 
 function Sliders:GetValue(): number
