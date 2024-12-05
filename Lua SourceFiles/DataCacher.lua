@@ -182,7 +182,7 @@ local DECIMAL_PLACES: number = 3
 --// Uses this string if the text fails to filter
 local FILTERED_RESULT: string = "###?"
 
---// Uses this datastore name to check if datastores are enabled
+--// Uses this datastore name to check if datastores are enabled (in Studio)
 local BURNER_DATASTORE_NAME = "____DS"
 
 --------------------------------------
@@ -268,14 +268,18 @@ end
 
 local __is_datstores_enabled = "NO_RESPONSE"
 do
-	task.defer(function()
-		local success = pcall(function()
-			DatastoreService:GetDataStore(BURNER_DATASTORE_NAME):SetAsync(
-				BURNER_DATASTORE_NAME, os.time()
-			)
+	if not RunService:IsStudio() then
+		__is_datstores_enabled = true
+	else
+		task.defer(function()
+			local success = pcall(function()
+				DatastoreService:GetDataStore(BURNER_DATASTORE_NAME):SetAsync(
+					BURNER_DATASTORE_NAME, os.time()
+				)
+			end)
+			__is_datstores_enabled = success
 		end)
-		__is_datstores_enabled = success
-	end)
+	end
 end
 
 local Globals
