@@ -10,7 +10,7 @@ A module that can create custom sliders with values with an increment.
 
 Notes:
 
-- If min and max are between 0 and 1, an increment must be specified
+- If min and max are between 0 and 1 (or anything similar), an increment must be specified
 
 ------------------------------------------------------------------
 
@@ -269,31 +269,34 @@ function Sliders.CreateSlider(container: GuiObject, slider: GuiButton, mode: "Ve
 	end
 
 	local isHoldingDown = false
+	
+	local function inputBegan()
+		local absolutePosition, absoluteSize = container.AbsolutePosition, container.AbsoluteSize
+		local minPosition, maxPosition = absolutePosition, absolutePosition + absoluteSize
+
+		local guiInset = GuiService:GetGuiInset()
+		local mousePosition = UserInputService:GetMouseLocation() - guiInset
+		mousePosition -= minPosition
+
+		local n
+		if mode == "Horizontal" then
+			n = math.clamp(mousePosition.X / absoluteSize.X, 0, 1)
+		elseif mode == "Vertical" then
+			n = math.clamp(mousePosition.Y / absoluteSize.Y, 0, 1)
+		end
+		self.updateSliderPosition(n)
+
+		local value = calculateValue(n)
+
+		self.value = value
+		self.onSlidingConnection:Fire(value)
+	end
 
 	self.rbx_connections["inputBegan"] = slider.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			isHoldingDown = true
 			while isHoldingDown do
-				local absolutePosition, absoluteSize = container.AbsolutePosition, container.AbsoluteSize
-				local minPosition, maxPosition = absolutePosition, absolutePosition + absoluteSize
-
-				local guiInset = GuiService:GetGuiInset()
-				local mousePosition = UserInputService:GetMouseLocation() - guiInset
-				mousePosition -= minPosition
-
-				local n
-				if mode == "Horizontal" then
-					n = math.clamp(mousePosition.X / absoluteSize.X, 0, 1)
-				elseif mode == "Vertical" then
-					n = math.clamp(mousePosition.Y / absoluteSize.Y, 0, 1)
-				end
-				self.updateSliderPosition(n)
-
-				local value = calculateValue(n)
-
-				self.value = value
-				self.onSlidingConnection:Fire(value)
-
+				inputBegan()
 				RunService.Heartbeat:Wait()
 			end
 		end
@@ -304,7 +307,13 @@ function Sliders.CreateSlider(container: GuiObject, slider: GuiButton, mode: "Ve
 			isHoldingDown = false
 		end
 	end)
-
+	
+	self.rbx_connections["inputBegan2"] = container.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			inputBegan()
+		end
+	end)
+	
 	local metatable = setmetatable({__slider = self}, Sliders)
 	self.rbx_connections["delete"] = slider.Destroying:Once(function()
 		metatable:Delete()
