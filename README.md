@@ -3,4 +3,5 @@
 These are my projects that I work on for fun. If you want to use it, go ahead.\
 **These assets can have bugs! Be advised when using it.**
 
-[Click here to view the Creator Store (Marketplace)](https://create.roblox.com/store/models?creatorName=Ellieforia&includeOnlyVerifiedCreators=true&keyword=&pageNumber=1)
+You can find my assets in the **Creator Store (Marketplace)**.
+Assets will be updated to their recent version.
