@@ -225,6 +225,8 @@ function Sliders.CreateSlider(container: GuiObject, slider: GuiButton, mode: "Ve
 		onSlidingConnection = Signal.Create(),
 		rbx_connections = {},
 		value = data.Min,
+		
+		__isDestroyed = false,
 	}
 
 	local range = data.Max - data.Min
@@ -295,7 +297,7 @@ function Sliders.CreateSlider(container: GuiObject, slider: GuiButton, mode: "Ve
 	self.rbx_connections["inputBegan"] = slider.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			isHoldingDown = true
-			while isHoldingDown do
+			while isHoldingDown and not self.__isDestroyed do
 				inputBegan()
 				RunService.Heartbeat:Wait()
 			end
@@ -342,6 +344,7 @@ function Sliders:Delete()
 		return
 	end
 	self.Destroyed = true
+	self.__slider.__isDestroyed = true
 
 	for name in self.__slider.rbx_connections do
 		self.__slider.rbx_connections[name]:Disconnect()
